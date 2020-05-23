@@ -10,4 +10,10 @@ public class AppTest {
     public void test() {
         assertThat(1, is(1));
     }
+
+    @Test
+    public void test1() {
+        App app = new App();
+        assertThat(app.foo(17), is(17 << 5));
+    }
 }
