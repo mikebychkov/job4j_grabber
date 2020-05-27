@@ -9,6 +9,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.CountDownLatch;
 
 import static org.quartz.JobBuilder.*;
 import static org.quartz.TriggerBuilder.*;
@@ -18,6 +19,7 @@ public class GrabSqlRu implements Grab {
 
     @Override
     public void init(Parse parse, Store store, SimpleScheduleBuilder schedule) {
+        CountDownLatch latch = new CountDownLatch(1);
         try {
             Scheduler scheduler = StdSchedulerFactory.getDefaultScheduler();
             scheduler.start();
@@ -25,6 +27,7 @@ public class GrabSqlRu implements Grab {
             JobDataMap data = new JobDataMap();
             data.put("parse", parse);
             data.put("store", store);
+            data.put("latch", latch);
 
             JobDetail job = newJob(GrabJob.class)
                     .usingJobData(data)
@@ -36,9 +39,7 @@ public class GrabSqlRu implements Grab {
 
             scheduler.scheduleJob(job, trigger);
 
-            do {
-                Thread.sleep(10000);
-            } while (scheduler.getCurrentlyExecutingJobs().size() > 0);
+            latch.await();
 
             scheduler.shutdown();
 
@@ -53,6 +54,7 @@ public class GrabSqlRu implements Grab {
         public void execute(JobExecutionContext context) {
             Parse parse = (Parse) context.getJobDetail().getJobDataMap().get("parse");
             Store store = (Store) context.getJobDetail().getJobDataMap().get("store");
+            CountDownLatch latch = (CountDownLatch) context.getJobDetail().getJobDataMap().get("latch");
             String url = "https://www.sql.ru/forum/job-offers/";
             int count = 1;
             List<Post> posts;
@@ -65,6 +67,7 @@ public class GrabSqlRu implements Grab {
                 }
                 count++;
             } while (posts.size() > 0);
+            latch.countDown();
         }
     }
 
